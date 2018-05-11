@@ -22,21 +22,6 @@ use Moo;
 
 =cut
 
-=attr attempt_code
-
-  ro, CodeRef, required
-
-The code to run to attempt doing the action. Will be evaluated taking care of
-the caller's context. It will receive parameters that were passed to C<run()>
-
-=cut
-
-has attempt_code => (
-    is => 'ro',
-    required => 1,
-    isa => sub { ref $_[0] eq 'CODE' },
-);
-
 =attr error_if_code
 
   ro, CodeRef
@@ -244,7 +229,7 @@ passed to C<on_failure_code> as well if the case arises.
 =cut
 
 sub run {
-    my $self = shift;
+    my ($self, $attempt_code) = @_;
 
     if (my $timestamp = $self->_circuit_open_until) {
         # we can't execute until the timestamp has done
@@ -263,13 +248,13 @@ sub run {
           
     if (wantarray) {
         $wantarray = 1;
-        @attempt_result = eval { $self->attempt_code->(@_) };
+        @attempt_result = eval { $attempt_code->(@_) };
         $error = $@;
     } elsif ( ! defined wantarray ) {
-        eval { $self->attempt_code->(@_) };
+        eval { $attempt_code->(@_) };
         $error = $@;
     } else {
-        $attempt_result = eval { $self->attempt_code->(@_) };
+        $attempt_result = eval { $attempt_code->(@_) };
         $error = $@;
     }
 
