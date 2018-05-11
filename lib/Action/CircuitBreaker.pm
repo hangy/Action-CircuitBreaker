@@ -264,7 +264,7 @@ sub run {
               or die 'The circuit is open and cannot be executed.';
             $self->_circuit_open_until(0);
             $self->has_on_circuit_close
-              and return $self->on_circuit_close->();
+              and $self->on_circuit_close->();
         }
 
         my $error;
@@ -297,8 +297,10 @@ sub run {
                 my $open_until = ($self->open_time * 1000) + ($seconds * 1000 + int($microseconds / 1000));
                 $self->_circuit_open_until($open_until);
                 $self->has_on_circuit_open
-                  and return $self->on_circuit_open->();
+                  and $self->on_circuit_open->();
             }
+        } else {
+            return $h->{attempt_result};
         }
     }
 }
