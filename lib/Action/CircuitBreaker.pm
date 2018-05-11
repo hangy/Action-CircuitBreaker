@@ -2,14 +2,11 @@ package Action::CircuitBreaker;
 
 # ABSTRACT: Module to try to perform an action, with an option to suspend execution after a number of failures.
 
-use Module::Runtime qw(use_module);
 use Scalar::Util qw(blessed);
-use Time::HiRes qw(usleep gettimeofday);
+use Time::HiRes qw(gettimeofday);
 use Carp;
 
 use base 'Exporter';
-our @EXPORT_OK = qw(retry);
-# export by default if run from command line
 our @EXPORT = ((caller())[1] eq '-e' ? @EXPORT_OK : ());
 
 use Moo;
