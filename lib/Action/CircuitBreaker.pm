@@ -18,16 +18,7 @@ use Moo;
 
   # OO interface
   use Action::CircuitBreaker;
-  Action::CircuitBreaker->new( attempt_code => sub { do_stuff; } )->run();
-
-  # Same, but sleep time is doubling each time, and arguments passed to the
-  # attempted code
-
-  # OO interface
-  my $action = Action::CircuitBreaker->new(
-    attempt_code => sub { my ($num, $str) = @_; ... },
-  );
-  my $result = $action->run(42, "foo");
+  Action::CircuitBreaker->new()->run(sub { do_stuff; });
 
 =cut
 
@@ -255,53 +246,50 @@ passed to C<on_failure_code> as well if the case arises.
 sub run {
     my $self = shift;
 
-    while(1) {
+    if (my $timestamp = $self->_circuit_open_until) {
+        # we can't execute until the timestamp has done
+        my ($seconds, $microseconds) = gettimeofday;
+        $seconds * 1000 + int($microseconds / 1000) >= $timestamp
+          or die 'The circuit is open and cannot be executed.';
+        $self->_circuit_open_until(0);
+        $self->has_on_circuit_close
+          and $self->on_circuit_close->();
+    }
 
-        if (my $timestamp = $self->_circuit_open_until) {
-            # we can't execute until the timestamp has done
-            my ($seconds, $microseconds) = gettimeofday;
-            $seconds * 1000 + int($microseconds / 1000) >= $timestamp
-              or die 'The circuit is open and cannot be executed.';
-            $self->_circuit_open_until(0);
-            $self->has_on_circuit_close
-              and $self->on_circuit_close->();
-        }
-
-        my $error;
-        my @attempt_result;
-        my $attempt_result;
-        my $wantarray;
+    my $error;
+    my @attempt_result;
+    my $attempt_result;
+    my $wantarray;
           
-        if (wantarray) {
-            $wantarray = 1;
-            @attempt_result = eval { $self->attempt_code->(@_) };
-            $error = $@;
-        } elsif ( ! defined wantarray ) {
-            eval { $self->attempt_code->(@_) };
-            $error = $@;
-        } else {
-            $attempt_result = eval { $self->attempt_code->(@_) };
-            $error = $@;
+    if (wantarray) {
+        $wantarray = 1;
+        @attempt_result = eval { $self->attempt_code->(@_) };
+        $error = $@;
+    } elsif ( ! defined wantarray ) {
+        eval { $self->attempt_code->(@_) };
+        $error = $@;
+    } else {
+        $attempt_result = eval { $self->attempt_code->(@_) };
+        $error = $@;
+    }
+
+    my $h = { action_retry => $self,
+              attempt_result => ( $wantarray ? \@attempt_result : $attempt_result ),
+              attempt_parameters => \@_,
+            };
+
+
+    if ($self->error_if_code->($error, $h)) {
+        $self->_current_retries_number($self->_current_retries_number + 1);
+        if ($self->_current_retries_number >= $self->max_retries_number) {
+            my ($seconds, $microseconds) = gettimeofday;
+            my $open_until = ($self->open_time * 1000) + ($seconds * 1000 + int($microseconds / 1000));
+            $self->_circuit_open_until($open_until);
+            $self->has_on_circuit_open
+              and $self->on_circuit_open->();
         }
-
-        my $h = { action_retry => $self,
-                  attempt_result => ( $wantarray ? \@attempt_result : $attempt_result ),
-                  attempt_parameters => \@_,
-                };
-
-
-        if ($self->error_if_code->($error, $h)) {
-            $self->_current_retries_number($self->_current_retries_number + 1);
-            if ($self->_current_retries_number >= $self->max_retries_number) {
-                my ($seconds, $microseconds) = gettimeofday;
-                my $open_until = ($self->open_time * 1000) + ($seconds * 1000 + int($microseconds / 1000));
-                $self->_circuit_open_until($open_until);
-                $self->has_on_circuit_open
-                  and $self->on_circuit_open->();
-            }
-        } else {
-            return $h->{attempt_result};
-        }
+    } else {
+        return $h->{attempt_result};
     }
 }
 

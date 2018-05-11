@@ -13,7 +13,9 @@ use Try::Tiny;
         attempt_code => sub { $var++; die "plop" },
     );
     try {
-        $action->run();
+        for my $x (0 .. 10) {
+            $action->run();
+        }
     } catch {
         # That's OK
     };
@@ -28,7 +30,9 @@ use Try::Tiny;
         on_circuit_open => sub { $opened++; },
    );
     try {
-        $action->run();
+        for my $x (0 .. 10) {
+            $action->run();
+        }
     } catch {
         # That's OK
    };
@@ -45,7 +49,9 @@ use Try::Tiny;
         open_time => 1,
     );
     try {
-        $action->run();
+        for my $x (0 .. 10) {
+            $action->run();
+        }
     } catch {
         # That's OK
     };
