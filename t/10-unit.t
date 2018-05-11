@@ -10,13 +10,13 @@ use Try::Tiny;
 {
     my $var = 0;
     my $action = Action::CircuitBreaker->new();
-    try {
-        for my $x (0 .. 10) {
+    for my $x (0 .. 10) {
+        try {
             $action->run(sub { $var++; die "plop" });
-        }
-    } catch {
-        # That's OK
-    };
+        } catch {
+            # That's OK
+        };
+    }
 
     is($var, 10, "expected 10 tries to be run");
 }
@@ -25,14 +25,14 @@ use Try::Tiny;
     my $opened = 0;
     my $action = Action::CircuitBreaker->new(
         on_circuit_open => sub { $opened++; },
-   );
-    try {
-        for my $x (0 .. 10) {
+    );
+    for my $x (0 .. 10) {
+        try {
             $action->run(sub { die "plop" });
-        }
-    } catch {
-        # That's OK
-   };
+        } catch {
+            # That's OK
+        };
+    }
 
     is($opened, 1, "expected circuit to be opened once");
 }
@@ -43,13 +43,13 @@ use Try::Tiny;
         on_circuit_close => sub { $closed++; },
         open_time => 1,
     );
-    try {
-        for my $x (0 .. 10) {
+    for my $x (0 .. 10) {
+        try {
             $action->run(sub { die "plop" });
-        }
-    } catch {
-        # That's OK
-    };
+        } catch {
+            # That's OK
+        };
+    }
 
     sleep(2);
     

@@ -273,6 +273,7 @@ sub run {
             $self->has_on_circuit_open
               and $self->on_circuit_open->();
         }
+        die $error;
     } else {
         return $h->{attempt_result};
     }
