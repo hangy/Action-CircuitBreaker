@@ -1,0 +1,18 @@
+language: perl
+perl:
+  - "5.20"
+  - "dev"
+matrix:
+  include:
+    - perl: 5.20
+      env:
+        - COVERAGE=1
+        - AUTHOR_TESTING=1
+  allow_failures:
+    - perl: dev
+sudo: false
+before_install:
+  - eval $(curl https://travis-perl.github.io/init) --auto --always-upgrade-modules
+cache:
+  directories:
+    - ~/perl5
