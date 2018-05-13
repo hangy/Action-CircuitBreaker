@@ -13,8 +13,7 @@ use Moo;
 
 =head1 SYNOPSIS
 
-  # Simple usage, will attempt to run the code, retrying if it dies, retrying
-  # 10 times max, sleeping 1 second between retries
+  # Will execute the code, as the circuit will be closed by default.
 
   # OO interface
   use Action::CircuitBreaker;
@@ -38,11 +37,13 @@ It will be given these arguments:
 =item * 
 
 as first argument, a scalar which is the value of any exception that were
-raised by the C<attempt_code>. Otherwise, undef.
+raised by the C<$attempt_code>. Otherwise, undef.
 
 =item *
 
 as second argument, a HashRef, which contains these keys:
+
+=back
 
 =over
 
@@ -53,26 +54,22 @@ the other attributes.
 
 =item attempt_result
 
-It's a scalar, which is the result of C<attempt_code>. If C<attempt_code>
+It's a scalar, which is the result of C<$attempt_code>. If C<$attempt_code>
 returned a list, then the scalar is the reference on this list.
 
 =item attempt_parameters
 
-It's the reference on the parameters that were given to C<attempt_code>.
-
-=back
+It's the reference on the parameters that were given to C<$attempt_code>.
 
 =back
 
 C<error_if_code> return value will be interpreted as a boolean : true return
-value means the execution of C<attempt_code> was a failure and should count
+value means the execution of C<$attempt_code> was a failure and should count
 towards breaking the ciruit. False means it went well.
 
 Here is an example of code that gets the arguments properly:
 
   my $action = Action::CircuitBreaker->new(
-    attempt_code => sub { do_stuff; } )->run();
-    attempt_code => sub { map { $_ * 2 } @_ }
     error_if_code => sub {
       my ($error, $h) = @_;
 
@@ -87,7 +84,7 @@ Here is an example of code that gets the arguments properly:
 
     }
   );
-  my @results = $action->run(1, 2);
+  my @results = $action->run(sub { print @_; }, 1, 2);
 
 =cut
 
@@ -200,30 +197,37 @@ Does the following:
 
 =item step 1
 
-Runs the C<attempt_code> CodeRef in the proper context in an eval {} block,
-saving C<$@> in C<$error>.
+Tests the value of C<_circuit_open_until>. If it is positive and the current
+timestamp is before the value, an error is thrown, because the circuit is
+still open. If the value is positive, but before the current timestamp,
+the circuit is closed (by setting C<_circuit_open_until> to 0) and optionally,
+C<on_circuit_close> is run.
 
 =item step 2
 
-Runs the C<error_if_code> CodeRef in scalar context, giving it as arguments
-C<$error>, and the return values of C<attempt_code>. If it returns true, we
-consider that it was a failure, and move to step 3. Otherwise, we consider it
-means success, and return the return values of C<attempt_code>.
+If the value of C<_circuit_open_until> is 0, the circuit is closed, and the
+passed sub gets executed. Then it runs the C<error_if_code> CodeRef in
+scalar context, giving it as arguments C<$error>, and the return values
+of C<$attempt_code>. If it returns true, we consider that it was a failure,
+and move to step 3. Otherwise, we consider it
+means success, and return the return values of C<$attempt_code>.
 
 =item step 3
 
-Ask the C<strategy> if it's still useful to retry. If yes, sleep accordingly,
-and go back to step 2. If not, go to step 4.
+Increase the value of C<_current_retries_number> and check whether it is
+larger than C<max_retries_number>. If it is, then open the circuit by setting
+C<_circuit_open_until> to the current time plus C<open_time>, and optionally
+run C<on_circuit_open>. Then, die with the C<$error> from C<$attempt_code>.
 
 =item step 4
 
 Runs the C<on_failure_code> CodeRef in the proper context, giving it as
-arguments C<$error>, and the return values of C<attempt_code>, and returns the
+arguments C<$error>, and the return values of C<$attempt_code>, and returns the
 results back to the caller.
 
 =back
 
-Arguments passed to C<run()> will be passed to C<attempt_code>. They will also
+Arguments passed to C<run()> will be passed to C<$attempt_code>. They will also
 passed to C<on_failure_code> as well if the case arises.
 
 =cut
@@ -279,13 +283,9 @@ sub run {
     }
 }
 
-=back
-
 =head1 SEE ALSO
 
 This code is heavily based on L<Action::Retry>.
-
-=back
 
 =cut
 
